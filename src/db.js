@@ -1,13 +1,14 @@
 const { Pool } = require('pg');
-const connectionString = process.env.DATABASE_URL;
 
+const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
-  throw new Error('DATABASE_URL not set in environment');
+  throw new Error('Missing DATABASE_URL env var');
 }
 
 const pool = new Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false } // Supabase requires SSL
+  // ΣΗΜΑΝΤΙΚΟ: μην κάνεις verify του cert (Supabase pooler δίνει self-signed)
+  ssl: { rejectUnauthorized: false }
 });
 
 module.exports = { pool };
