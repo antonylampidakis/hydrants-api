@@ -43,3 +43,30 @@ app.get('/hydrants', async (req, res) => {
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`API running on port ${port}`));
+
+// GET /hydrants/near?lon=23.73&lat=37.98&radius=1000
+app.get('/hydrants/near', async (req, res) => {
+  try {
+    const { lon, lat } = req.query;
+    const radius = parseInt(req.query.radius || '1000', 10); // μέτρα
+    if (lon === undefined || lat === undefined) {
+      return res.status(400).json({ error: 'lon and lat are required' });
+    }
+    const q = `
+      with p as (select ST_SetSRID(ST_MakePoint($1,$2),4326)::geography as c)
+      select id, code, name, address, status, municipality,
+             ST_X(geom::geometry) as lon, ST_Y(geom::geometry) as lat,
+             ST_Distance(geom,(select c from p)) as meters_away
+      from hydrants
+      where ST_DWithin(geom,(select c from p), $3)
+      order by meters_away asc
+      limit 200;
+    `;
+    const { rows } = await pool.query(q, [Number(lon), Number(lat), radius]);
+    res.json(rows);
+  } catch (err) {
+    console.error('NEAR ERROR:', err);
+    res.status(500).json({ error: 'server_error', detail: String(err.message || err) });
+  }
+});
+
