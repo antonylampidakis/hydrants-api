@@ -8,17 +8,34 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// health check
+// Healthcheck
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// list hydrants
+// DB test: γυρνάει την ώρα από τη βάση
+app.get('/dbtest', async (req, res) => {
+  try {
+    const r = await pool.query('select now() as now');
+    res.json({ ok: true, now: r.rows[0].now });
+  } catch (err) {
+    console.error('DBTEST ERROR:', err);
+    res.status(500).json({ ok: false, error: String(err.message || err) });
+  }
+});
+
+// Όλοι οι κρουνοί (βασικό)
 app.get('/hydrants', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name FROM hydrants LIMIT 50;');
-    res.json(result.rows);
+    const q = `select id, code, name, address, status, municipality,
+                      ST_X(geom::geometry) as lon, ST_Y(geom::geometry) as lat,
+                      created_at
+               from hydrants
+               order by created_at desc
+               limit 50;`;
+    const { rows } = await pool.query(q);
+    res.json(rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server_error' });
+    console.error('HYDRANTS ERROR:', err);
+    res.status(500).json({ error: 'server_error', detail: String(err.message || err) });
   }
 });
 
