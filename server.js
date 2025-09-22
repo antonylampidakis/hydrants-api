@@ -11,7 +11,7 @@ app.use(express.json());
 // Healthcheck
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// DB test: γυρνάει την ώρα από τη βάση
+// DB test: απλή ερώτηση προς τη βάση
 app.get('/dbtest', async (req, res) => {
   try {
     const r = await pool.query('select now() as now');
@@ -25,12 +25,14 @@ app.get('/dbtest', async (req, res) => {
 // Όλοι οι κρουνοί (βασικό)
 app.get('/hydrants', async (req, res) => {
   try {
-    const q = `select id, code, name, address, status, municipality,
-                      ST_X(geom::geometry) as lon, ST_Y(geom::geometry) as lat,
-                      created_at
-               from hydrants
-               order by created_at desc
-               limit 50;`;
+    const q = `
+      select id, code, name, address, status, municipality,
+             ST_X(geom::geometry) as lon, ST_Y(geom::geometry) as lat,
+             created_at
+      from hydrants
+      order by created_at desc
+      limit 50;
+    `;
     const { rows } = await pool.query(q);
     res.json(rows);
   } catch (err) {
