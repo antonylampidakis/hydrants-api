@@ -6,7 +6,8 @@ const { pool } = require('./src/db');
 dotenv.config();
 const app = express();
 
-app.use(cors());
+const allowed = (process.env.ALLOWED_ORIGINS || '*').split(',');
+app.use(cors({ origin: allowed }));
 app.use(express.json({ limit: '2mb' }));
 
 // Healthcheck
