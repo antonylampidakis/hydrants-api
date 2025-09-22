@@ -70,3 +70,52 @@ app.get('/hydrants/near', async (req, res) => {
   }
 });
 
+// POST /hydrants
+// body: { code?, name?, address?, status?, lon, lat, municipality? }
+app.post('/hydrants', async (req, res) => {
+  try {
+    const { code, name, address, status = 'active', lon, lat, municipality } = req.body || {};
+    if (lon === undefined || lat === undefined) {
+      return res.status(400).json({ error: 'lon and lat are required' });
+    }
+    const q = `
+      insert into hydrants (code, name, address, status, geom, municipality)
+      values ($1,$2,$3,$4, ST_SetSRID(ST_MakePoint($5,$6),4326)::geography, $7)
+      returning id;
+    `;
+    const { rows } = await pool.query(q, [
+      code || null, name || null, address || null, status,
+      Number(lon), Number(lat), municipality || null
+    ]);
+    res.status(201).json({ id: rows[0].id });
+  } catch (err) {
+    console.error('INSERT ERROR:', err);
+    res.status(400).json({ error: 'bad_request', detail: String(err.message || err) });
+  }
+});
+// GET /hydrants/bbox?minLon=23.70&minLat=37.97&maxLon=23.76&maxLat=38.02
+app.get('/hydrants/bbox', async (req, res) => {
+  try {
+    const { minLon, minLat, maxLon, maxLat } = req.query;
+    const nums = [minLon, minLat, maxLon, maxLat].map(Number);
+    if (nums.some(n => Number.isNaN(n))) {
+      return res.status(400).json({ error: 'minLon, minLat, maxLon, maxLat are required (numbers)' });
+    }
+    const q = `
+      select id, code, name, address, status, municipality,
+             ST_X(geom::geometry) as lon, ST_Y(geom::geometry) as lat,
+             created_at
+      from hydrants
+      where ST_Intersects(
+        geom::geometry,
+        ST_MakeEnvelope($1,$2,$3,$4,4326)
+      )
+      limit 1000;
+    `;
+    const { rows } = await pool.query(q, nums);
+    res.json(rows);
+  } catch (err) {
+    console.error('BBOX ERROR:', err);
+    res.status(500).json({ error: 'server_error', detail: String(err.message || err) });
+  }
+});
